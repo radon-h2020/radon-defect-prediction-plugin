@@ -4,8 +4,13 @@
 	"description": "A plugin to run the RADONh2020 Defect Predictor",
 	"version": "0.0.1",
 	"publisher": "sdallapalma",
+	"url": "https://sdallapalma@dev.azure.com/sdallapalma/radon-defect-prediction-plugin/_git/radon-defect-prediction-plugin",
 	"engines": {
 		"vscode": "^1.44.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/radon-h2020/radon-defect-prediction-plugin.git"
 	},
 	"categories": [
 		"Other"
@@ -16,11 +21,11 @@
 	"main": "./out/extension.js",
 	"contributes": {
 		"menus": {
-			"editor/title": [
+			"editor/context": [
 			  {
 				"when": "resourceLangId == yaml",
 				"command": "radon-defect-prediction-plugin.run",
-				"group": "navigation"
+				"group": "myGroup@1"
 			  }
 			]
 		},

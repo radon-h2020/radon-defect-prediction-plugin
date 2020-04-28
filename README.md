@@ -20,4 +20,4 @@ If you have any requirements or dependencies, add a section describing those and
 
 ## Release Notes
 
-See [CHANGELOG](./CHANGELOG.md)
+See CHANGELOG
