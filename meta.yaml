@@ -12,4 +12,3 @@ category: Other
 spec:                                             
   extensions:                                                   
     - https://github.com/radon-h2020/radon-defect-prediction-plugin/blob/0.0.1/radon-defect-prediction-plugin-0.0.1.vsix?raw=true
-    - vscode:extension/sdallapalma.radon-defect-prediction-plugin
