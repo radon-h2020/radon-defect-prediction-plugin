@@ -1,5 +1,5 @@
-apiVersion: v2                                                   
-publisher: sdallapalma                                                 
+apiVersion: v3                                                   
+publisher: radon                                                 
 name: radon-defect-prediction-plugin                                              
 version: 0.0.1
 type: VS Code extension                                                      
