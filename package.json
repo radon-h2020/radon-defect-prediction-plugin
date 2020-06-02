@@ -1,10 +1,10 @@
 {
-	"name": "radon-defect-prediction-plugin",
+	"name": "radon-defect-predictor",
 	"displayName": "Radon-h2020 Defect Predictor",
 	"description": "A plugin to run the RADONh2020 Defect Predictor",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"publisher": "sdallapalma",
-	"url": "https://sdallapalma@dev.azure.com/sdallapalma/radon-defect-prediction-plugin/_git/radon-defect-prediction-plugin",
+	"url": "https://github.com/radon-h2020/radon-defect-prediction-plugin",
 	"engines": {
 		"vscode": "^1.44.0"
 	},
@@ -22,17 +22,24 @@
 	"contributes": {
 		"menus": {
 			"editor/context": [
-			  {
-				"when": "resourceLangId == yaml",
-				"command": "radon-defect-prediction-plugin.run",
-				"group": "myGroup@1"
-			  }
+				{
+					"when": "resourceLangId == yaml",
+					"command": "radon-defect-prediction-plugin.run",
+					"group": "myGroup@1"
+				}
+			],
+			"explorer/context": [
+				{
+					"when": "resourceLangId == yaml",
+					"command": "radon-defect-prediction-plugin.run",
+					"group": "myGroup@1"
+				}
 			]
 		},
 		"commands": [
 			{
-			  "command": "radon-defect-prediction-plugin.run",
-			  "title": "Run detection"
+				"command": "radon-defect-prediction-plugin.run",
+				"title": "Run detection"
 			}
 		]
 	},

@@ -2,22 +2,19 @@
 
 A Visual Studio Code plugin for the RADON-h2020 Defect Predictor.
 
-## Features
+## How to use
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+Right-click on the YAML file to analyse, then click on *Run detection*.
 
-For example if there is an image subfolder under your extension project workspace:
+![Alt Text](media/defect-predictor-plugin.gif)
 
-\!\[feature X\]\(images/feature-x.png\)
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
+* The extension only requires an internet connection to call the APIs.
 
 
 ## Release Notes
 
-See CHANGELOG
+See [CHANGELOG](CHANGELOG.md)
