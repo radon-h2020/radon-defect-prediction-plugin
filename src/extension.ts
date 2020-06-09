@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import * as path from 'path';
 
 const AXIOS = require('axios').default;
-const URL = 'https://c75daf1c5978.ngrok.io/api/classification/classify';
+const URL = 'http://giovannirosa.com:5555/api/classification/classify';
 
 export function activate(context: vscode.ExtensionContext) {
 
