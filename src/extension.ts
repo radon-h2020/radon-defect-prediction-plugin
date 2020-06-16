@@ -30,18 +30,26 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		})
 		.then(function (response: any) {
-
-			console.log(response)
-
 			let json_data = response.data.metrics
 
 			json_data['defective'] = response.data.defective.toString().toUpperCase()
 			json_data['file'] = fileName
+	
+			//Create output channel
+			//let outputChannel = vscode.window.createOutputChannel("Receptor")
+
+			for (let [key, value] of Object.entries(json_data)) {
+				if(value != 0){
+					//Write to output.
+					//outputChannel.appendLine(`${key} => ${value}`)
+					console.info(`${key} => ${value}`)
+				}
+			}
 
 			panel.webview.html = getWebviewContent(json_data)
 		})
 		.catch(function (error: any) {
-			console.log(error)
+			console.info(error)
 			vscode.window.showErrorMessage('Cannot read the file. Make sure it is a valid not-empty YAML-based Ansible file');
 		});
 	});

@@ -2,7 +2,7 @@
 	"name": "radon-defect-predictor",
 	"displayName": "Radon-h2020 Defect Predictor",
 	"description": "A plugin to run the RADONh2020 Defect Predictor",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"publisher": "sdallapalma",
 	"url": "https://github.com/radon-h2020/radon-defect-prediction-plugin",
 	"engines": {
