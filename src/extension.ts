@@ -1,17 +1,18 @@
 import * as vscode from 'vscode';
-import { readFileSync } from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
 
 const AXIOS = require('axios').default;
-const URL = 'http://giovannirosa.com:5555/api/classification/classify';
 
 export function activate(context: vscode.ExtensionContext) {
 
 	let disposable = vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri: vscode.Uri) => {
+
+		vscode.window.showInformationMessage('Detection started...')
+		
 		const filePath = uri.path;
 		const fileName = path.basename(filePath);
-		
-		const content = readFileSync(filePath, 'utf-8');
+		const content = fs.readFileSync(filePath, 'utf-8');
 
 		// Create and show panel
 		const panel = vscode.window.createWebviewPanel(
@@ -23,8 +24,8 @@ export function activate(context: vscode.ExtensionContext) {
 				enableScripts: true
 			}
 		);
-
-		AXIOS.post(URL, content.toString(), {
+		
+		AXIOS.post('https://radon.giovanni.pink/api/classification/classify', content.toString(), {
 			headers: {
 				'Content-Type': 'text/plain',
 			}
@@ -35,21 +36,9 @@ export function activate(context: vscode.ExtensionContext) {
 			json_data['defective'] = response.data.defective.toString().toUpperCase()
 			json_data['file'] = fileName
 	
-			//Create output channel
-			//let outputChannel = vscode.window.createOutputChannel("Receptor")
-
-			for (let [key, value] of Object.entries(json_data)) {
-				if(value != 0){
-					//Write to output.
-					//outputChannel.appendLine(`${key} => ${value}`)
-					console.info(`${key} => ${value}`)
-				}
-			}
-
 			panel.webview.html = getWebviewContent(json_data)
 		})
 		.catch(function (error: any) {
-			console.info(error)
 			vscode.window.showErrorMessage('Cannot read the file. Make sure it is a valid not-empty YAML-based Ansible file');
 		});
 	});
@@ -59,7 +48,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
-
 
 
 function getWebviewContent(data: JSON) {

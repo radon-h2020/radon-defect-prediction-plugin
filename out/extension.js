@@ -1,21 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const vscode = require("vscode");
-const fs_1 = require("fs");
 const path = require("path");
+const fs = require("fs");
 const AXIOS = require('axios').default;
-const URL = 'http://giovannirosa.com:5555/api/classification/classify';
 function activate(context) {
     let disposable = vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri) => {
+        vscode.window.showInformationMessage('Detection started...');
         const filePath = uri.path;
         const fileName = path.basename(filePath);
-        const content = fs_1.readFileSync(filePath, 'utf-8');
+        const content = fs.readFileSync(filePath, 'utf-8');
         // Create and show panel
         const panel = vscode.window.createWebviewPanel('radon-defect-predictor', 'Receptor', vscode.ViewColumn.Two, {
             localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'src', 'html'))],
             enableScripts: true
         });
-        AXIOS.post(URL, content.toString(), {
+        AXIOS.post('https://radon.giovanni.pink/api/classification/classify', content.toString(), {
             headers: {
                 'Content-Type': 'text/plain',
             }
@@ -24,19 +24,9 @@ function activate(context) {
             let json_data = response.data.metrics;
             json_data['defective'] = response.data.defective.toString().toUpperCase();
             json_data['file'] = fileName;
-            //Create output channel
-            //let outputChannel = vscode.window.createOutputChannel("Receptor")
-            for (let [key, value] of Object.entries(json_data)) {
-                if (value != 0) {
-                    //Write to output.
-                    //outputChannel.appendLine(`${key} => ${value}`)
-                    console.info(`${key} => ${value}`);
-                }
-            }
             panel.webview.html = getWebviewContent(json_data);
         })
             .catch(function (error) {
-            console.info(error);
             vscode.window.showErrorMessage('Cannot read the file. Make sure it is a valid not-empty YAML-based Ansible file');
         });
     });
