@@ -13,6 +13,7 @@ const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs");
 const AXIOS = require('axios').default;
+const cp = require('child_process');
 const extract = require('extract-zip');
 const thresholds = { avg_task_size: { q1: 4.0, median: 6.0, q3: 10.0, outlier: 19.0 }, lines_blank: { q1: 1.0, median: 2.0, q3: 6.0, outlier: 13.5 }, lines_code: { q1: 7.0, median: 16.0, q3: 36.0, outlier: 79.5 }, lines_comment: { q1: 0.0, median: 0.0, q3: 2.0, outlier: 5.0 }, num_conditions: { q1: 0.0, median: 0.0, q3: 2.0, outlier: 5.0 }, num_decisions: { q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5 }, num_distinct_modules: { q1: 0.0, median: 1.0, q3: 4.0, outlier: 10.0 }, num_external_modules: { q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5 }, num_filters: { q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5 }, num_keys: { q1: 6.0, median: 13.0, q3: 30.0, outlier: 66.0 }, num_loops: { q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5 }, num_parameters: { q1: 0.0, median: 0.0, q3: 6.0, outlier: 15.0 }, num_tasks: { q1: 1.0, median: 2.0, q3: 4.0, outlier: 8.5 }, num_tokens: { q1: 17.0, median: 46.0, q3: 116.0, outlier: 264.5 }, num_unique_names: { q1: 1.0, median: 2.0, q3: 5.0, outlier: 11.0 }, num_vars: { q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5 }, text_entropy: { q1: 3.75, median: 4.78, q3: 5.5, outlier: 8.125 } };
 const metrics_description = {
@@ -35,21 +36,8 @@ const metrics_description = {
     num_vars: "Number of variables in the playbook.",
     text_entropy: "Mesures the complexity of a script based on its information content, analogous to the class entropy complexity. Interpretation: the higher the entropy, the more challenging to maintain the blueprint."
 };
-function classify(content) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return AXIOS.post('https://radon.giovanni.pink/api/classification/classify', content, {
-            headers: { 'Content-Type': 'text/plain' }
-        })
-            .then(function (response) {
-            let json_data = response.data.metrics;
-            json_data['defective'] = response.data.defective.toString().toUpperCase();
-            return json_data;
-        })
-            .catch(function (error) {
-            return undefined;
-        });
-    });
-}
+var ansible_model_id = undefined;
+var tosca_model_id = undefined;
 function walk(dir, filelist) {
     /*
     Return all the yaml and tosca files in the folder
@@ -59,68 +47,153 @@ function walk(dir, filelist) {
     files.forEach(function (file) {
         if (fs.statSync(path.join(dir, file)).isDirectory())
             filelist = walk(path.join(dir, file), filelist);
-        else if (file.split('.').pop() == 'yml' || file.split('.').pop() == 'tosca')
+        else if (file.split('.').pop() == 'tosca')
             filelist.push(path.join(dir, file));
+        else if (file.split('.').pop() == 'yml' || file.split('.').pop() == 'yaml') {
+            const content = fs.readFileSync(file, 'utf-8');
+            if (content.includes('tosca_definitions_version'))
+                filelist.push(path.join(dir, file));
+        }
     });
     return filelist;
 }
 ;
-var accordion = '';
+function extract_ansible_metrics(filePath) {
+    try {
+        const res = cp.execSync(`ansible-metrics ${filePath} -o`);
+        return JSON.parse(res.toString());
+    }
+    catch (err) {
+        console.log(err);
+        return undefined;
+    }
+}
+function extract_tosca_metrics(filePath) {
+    try {
+        // TODO replace with tosca-metrics
+        const res = cp.execSync(`ansible-metrics ${filePath} -o`);
+        return JSON.parse(res.toString());
+    }
+    catch (err) {
+        console.log(err);
+        return undefined;
+    }
+}
+function fetch_model(language) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return yield Promise.resolve(AXIOS.get(`https://radon-test-api.herokuapp.com/models?language=${language}&repository_size=500&has_license=1`)
+                .then(function (response) { return response.data.model_id; })
+                .catch(function () { return undefined; }));
+        }
+        catch (err) {
+            console.log(err);
+            return undefined;
+        }
+    });
+}
+function predict(queryParams) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return yield Promise.resolve(AXIOS.get(`https://radon-test-api.herokuapp.com/predictions?${queryParams}`)
+                .then(function (response) { return response.data; })
+                .catch(function () { return undefined; }));
+        }
+        catch (err) {
+            console.log(err);
+            return undefined;
+        }
+    });
+}
 function activate(context) {
-    let disposable = vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri) => {
-        vscode.window.showInformationMessage('Detection started. Please wait for the results...');
+    context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri) => __awaiter(this, void 0, void 0, function* () {
         // Create and show panel
         const panel = vscode.window.createWebviewPanel('radon-defect-predictor', 'Receptor', vscode.ViewColumn.Two, {
             localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'src', 'html'))],
             enableScripts: true
         });
-        const filePath = uri.path;
-        const fileExtension = filePath.split('.').pop();
-        if (fileExtension == 'csar') {
-            const unzipped_dir = filePath.replace('.csar', '');
-            extract(filePath, { dir: unzipped_dir }).then(function (err) {
-                let files = walk(unzipped_dir, []);
-                files.forEach(function (file) {
-                    const content = fs.readFileSync(file, 'utf-8');
-                    classify(content.toString()).then(function (result) {
-                        if (result) {
-                            result['file'] = file.replace(filePath.replace('.csar', ''), '');
-                            panel.webview.html = getWebviewContent(result);
-                        }
-                        else {
-                            vscode.window.showErrorMessage('Cannot read the file. Make sure it is a valid not-empty YAML-based Ansible file');
-                        }
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Running failures detection",
+            cancellable: true
+        }, (progress, token) => __awaiter(this, void 0, void 0, function* () {
+            token.onCancellationRequested(() => {
+                console.log("User canceled the operation");
+            });
+            progress.report({ increment: 0 });
+            const editor = vscode.window.activeTextEditor;
+            if (!editor)
+                return;
+            let filePath = uri ? path.normalize(uri.path) : path.normalize(editor.document.uri.path);
+            filePath = filePath.replace('\\c:', 'C:');
+            const fileExtension = filePath.split('.').pop();
+            progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
+            if (fileExtension == 'csar') {
+                const model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
+                const unzipped_dir = filePath.replace('.csar', '');
+                extract(filePath, { dir: unzipped_dir }).then(function (err) {
+                    let files = walk(unzipped_dir, []);
+                    const increment = Math.round(75 / files.lenght);
+                    let i = 0;
+                    files.forEach(function (filePath) {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            const metrics = extract_tosca_metrics(filePath);
+                            let query = '';
+                            for (let [key, value] of Object.entries(metrics)) {
+                                if (typeof value == "number") {
+                                    query += key + "=" + value + "&";
+                                }
+                            }
+                            query += "language=tosca&model_id=" + model_id;
+                            const prediction = yield predict(query);
+                            prediction['file'] = path.basename(filePath);
+                            prediction['metrics'] = metrics;
+                            i += 1;
+                            progress.report({ increment: increment, message: "Pocessed ${i} files out of ${files.lenght}" });
+                            panel.webview.html = getWebviewContent(prediction);
+                        });
+                    });
+                    // delete folder
+                    fs.rmdir(unzipped_dir, { recursive: true }, (err) => {
+                        if (err)
+                            throw err;
                     });
                 });
-                // delete folder
-                fs.rmdir(unzipped_dir, { recursive: true }, (err) => {
-                    if (err)
-                        throw err;
-                });
-            });
-            return;
-        }
-        else {
-            const fileName = path.basename(filePath);
-            const content = fs.readFileSync(filePath, 'utf-8');
-            classify(content.toString()).then(function (result) {
-                if (result) {
-                    result['file'] = fileName;
-                    panel.webview.html = getWebviewContent(result);
-                    accordion = '';
+            }
+            else {
+                let language = undefined;
+                let metrics = undefined;
+                let model_id = undefined;
+                progress.report({ increment: 25, message: "Preparing model..." });
+                const content = fs.readFileSync(filePath, 'utf-8');
+                if (content.includes('tosca_definitions_version')) {
+                    language = 'tosca';
+                    metrics = extract_tosca_metrics(filePath);
+                    model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
                 }
                 else {
-                    vscode.window.showErrorMessage('Cannot read the file. Make sure it is a valid not-empty YAML-based Ansible file');
+                    language = 'ansible';
+                    metrics = extract_ansible_metrics(filePath);
+                    model_id = ansible_model_id ? ansible_model_id : yield fetch_model('ansible');
                 }
-            });
-        }
-    });
-    context.subscriptions.push(disposable);
+                let query = '';
+                for (let [key, value] of Object.entries(metrics)) {
+                    if (typeof value == "number") {
+                        query += key + "=" + value + "&";
+                    }
+                }
+                query += "language=" + language + "&model_id=" + model_id;
+                const prediction = yield predict(query);
+                prediction['file'] = path.basename(filePath);
+                prediction['metrics'] = metrics;
+                progress.report({ increment: 75, message: "Done! See the opened panel for more information." });
+                panel.webview.html = getWebviewContent(prediction);
+            }
+            return;
+        }));
+    })));
 }
 exports.activate = activate;
-// this method is called when your extension is deactivated
-function deactivate() { }
-exports.deactivate = deactivate;
 var viewContent = `
 <!doctype html>
 <html lang="en">
@@ -171,9 +244,10 @@ var viewContent = `
 </body>
 </html>`;
 function getWebviewContent(data) {
+    let title = data.file.toString();
+    var accordion = '';
     let tbody = '';
-    let title = '';
-    for (let [key, value] of Object.entries(data)) {
+    Object.entries(data.metrics).forEach(([key, value]) => {
         let formatted_name = key.toLowerCase()
             .split('_')
             .map((s) => s.charAt(0).toUpperCase() + s.substring(1))
@@ -202,19 +276,30 @@ function getWebviewContent(data) {
             if (value != 0)
                 tbody += `<tr><td>${formatted_name} <span type="button" data-toggle="tooltip" data-placement="bottom" title="${metrics_description[key]}">&#9432;</span></td><td><div style="text-align: right; background-color: ${color_class}">${value}</div></td></tr>`;
         }
-        if (key == 'file')
-            title = value;
+    });
+    let prediction_description = '';
+    if (data.failure_prone) {
+        prediction_description = 'This script was predicted <b>failure-prone</b> because:<ul>';
+        for (const clause of data.decision) {
+            let formatted_metric_name = clause[0].toLowerCase()
+                .split('_')
+                .map((s) => s.charAt(0).toUpperCase() + s.substring(1))
+                .join(' ');
+            prediction_description += `<li>${formatted_metric_name} ${clause[1]} ${Math.round(clause[2] * 100) / 100}</li>`;
+        }
+        prediction_description += '</ul>';
     }
     let id = title.replace(/[_\.\/]/g, '');
     accordion += `
 		<div class="card">
 			<button class="btn btn-link text-left" type="button" data-toggle="collapse" data-target="#collapse-${id}" aria-expanded="false" aria-controls="collapse-${id}">
 				<div class="card-header">
-					<h5 class="mb-0">${title}</h5>
+					<h5 class="mb-0">${title} ${data.failure_prone ? '&#9888;' : ''}</h5>
 				</div>
 			</button>
 			<div id="collapse-${id}" class="collapse" aria-labelledby="heading-${id}" data-parent="#accordion">
 				<div class="card-body">
+					${prediction_description}
 					<table data-toggle="table">
 						<thead>
 							<tr>
