@@ -11,7 +11,7 @@ repository: https://github.com/radon-h2020/radon-defect-prediction-plugin
 category: Other
 spec:
   containers:                                                   
-    - image: radonconsortium/repo-scorer:latest                                                    
+    - image: stefadp/cbmc:latest                                                    
       memoryLimit: 512Mi                                           
       memoryRequest: 512Mi                                        
       cpuLimit: 2                                                
