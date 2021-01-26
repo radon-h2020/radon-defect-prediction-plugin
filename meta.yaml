@@ -15,8 +15,6 @@ spec:
       memoryLimit: 512Mi                                           
       memoryRequest: 512Mi                                        
       cpuLimit: 2                                                
-      cpuRequest: 2   
-      args:
-        - ${PLUGIN_REMOTE_ENDPOINT_EXECUTABLE}  
+      cpuRequest: 2 
   extensions:
     - https://raw.githubusercontent.com/radon-h2020/radon-defect-prediction-plugin/master/radon-defect-predictor-0.0.5.vsix
