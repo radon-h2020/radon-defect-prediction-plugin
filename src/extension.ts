@@ -6,6 +6,43 @@ const AXIOS = require('axios').default;
 const cp = require('child_process')
 const extract = require('extract-zip')
 
+const HTML_SPINNER = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.loader {
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #3498db;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+
+/* Safari */
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+</head>
+<body>
+
+<div class="loader" style="margin:0 auto; margin-top: 100px;"></div>
+<h2> <p align="center">{{info}}</p></h2>
+
+</body>
+</html>
+`
+
 const thresholds:any = {avg_task_size: {q1: 4.0, median: 6.0, q3: 10.0, outlier: 19.0}, lines_blank: {q1: 1.0, median: 2.0, q3: 6.0, outlier: 13.5}, lines_code: {q1: 7.0, median: 16.0, q3: 36.0, outlier: 79.5}, lines_comment: {q1: 0.0, median: 0.0, q3: 2.0, outlier: 5.0}, num_conditions: {q1: 0.0, median: 0.0, q3: 2.0, outlier: 5.0}, num_decisions: {q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5}, num_distinct_modules: {q1: 0.0, median: 1.0, q3: 4.0, outlier: 10.0}, num_external_modules: {q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5}, num_filters: {q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5}, num_keys: {q1: 6.0, median: 13.0, q3: 30.0, outlier: 66.0}, num_loops: {q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5}, num_parameters: {q1: 0.0, median: 0.0, q3: 6.0, outlier: 15.0}, num_tasks: {q1: 1.0, median: 2.0, q3: 4.0, outlier: 8.5}, num_tokens: {q1: 17.0, median: 46.0, q3: 116.0, outlier: 264.5}, num_unique_names: {q1: 1.0, median: 2.0, q3: 5.0, outlier: 11.0}, num_vars: {q1: 0.0, median: 0.0, q3: 1.0, outlier: 2.5}, text_entropy: {q1: 3.75, median: 4.78, q3: 5.5, outlier: 8.125}}
 const metrics_description:any = {
 	avg_task_size: "Average number of code lines in tasks: LinesCode(tasks)/NumTasks. Interpretation: the higher the more complex and the more challenging to maintain the blueprint.", 
@@ -28,6 +65,8 @@ const metrics_description:any = {
 	text_entropy: "Mesures the complexity of a script based on its information content, analogous to the class entropy complexity. Interpretation: the higher the entropy, the more challenging to maintain the blueprint."
 }
 
+
+var accordion:string = ''
 var ansible_model_id:any = undefined
 var tosca_model_id:any = undefined
 
@@ -37,17 +76,11 @@ function walk(dir: any, filelist: any) {
 	*/
 	let files = fs.readdirSync(dir);
 	filelist = filelist || [];
-	
 	files.forEach(function(file) {
-	  if (fs.statSync(path.join(dir, file)).isDirectory()) 
-	  	filelist = walk(path.join(dir, file), filelist);
-	  else if (file.split('.').pop() == 'tosca')
-		  filelist.push(path.join(dir, file));
-	  else if(file.split('.').pop() == 'yml' || file.split('.').pop() == 'yaml'){		  
-		  const content = fs.readFileSync(file, 'utf-8');
-		  if(content.includes('tosca_definitions_version'))
-		  	filelist.push(path.join(dir, file));
-	  }
+		if (fs.statSync(path.join(dir, file)).isDirectory()) 
+	  		filelist = walk(path.join(dir, file), filelist);
+	  	else if (file.split('.').pop() == 'tosca')
+			filelist.push(path.join(dir, file));
 	});
 
 	return filelist;
@@ -67,7 +100,7 @@ function extract_ansible_metrics(filePath:string) {
 function extract_tosca_metrics(filePath:string) {
 	try{	
 		// TODO replace with tosca-metrics
-		const res = cp.execSync(`ansible-metrics ${filePath} -o`)
+		const res = cp.execSync(`tosca-metrics ${filePath} -o --omit-zero-metrics`)
 		return JSON.parse(res.toString())
 	}
 	catch (err){
@@ -104,11 +137,11 @@ async function predict(queryParams: string){
 	}
 }
 
-
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.run', async (uri: vscode.Uri)  => {
-		// Create and show panel
-		const panel = vscode.window.createWebviewPanel(
+		
+		
+		var panel:any = vscode.window.createWebviewPanel(
 			'radon-defect-predictor',
 			'Receptor',
 			vscode.ViewColumn.Two,
@@ -117,6 +150,8 @@ export function activate(context: vscode.ExtensionContext) {
 				enableScripts: true
 			}
 		);
+		
+		panel.webview.html = HTML_SPINNER.replace('{{info}}', '')
 
 		vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
@@ -139,19 +174,33 @@ export function activate(context: vscode.ExtensionContext) {
 			progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
 			
 			if(fileExtension == 'csar') {
-				
+				panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Extracting the CSAR...')
+				accordion = ''
+
 				const model_id = tosca_model_id ? tosca_model_id : await fetch_model('tosca')	
 				const unzipped_dir = filePath.replace('.csar', '')
-
+				
+				progress.report({ increment: 50, message: "Extracting and analyzing the CSAR..." });
 				extract(filePath, {dir: unzipped_dir}).then(function (err: any) {
-						
-					let files = walk(unzipped_dir, [])
-					const increment = Math.round(75/files.lenght)
 					
-					let i = 0
-					files.forEach(async function(filePath: string) {	
+					if(err){
+						console.log(err)
+						panel.webview.html = '<h2>Ops. We are sorry. An error occurred!</h2>'
+						return
+					}
+
+					let files = walk(unzipped_dir, [])
+					
+					panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Predicting the failure-proneness of TOSCA blueprints...')
+					progress.report({ increment: 80, message: "Predicting failure-proneness of TOSCA blueprints..." });
+
+					for(let i=0; i < files.length; i++){
+						const filePath = files[i]
 
 						const metrics = extract_tosca_metrics(filePath)
+						if(metrics == undefined){
+							continue
+						}
 
 						let query = ''
 						for (let [key, value] of Object.entries(metrics)) {
@@ -161,28 +210,36 @@ export function activate(context: vscode.ExtensionContext) {
 						}
 
 						query += "language=tosca&model_id=" + model_id
-						
-						const prediction: any = await predict(query)
-						prediction['file'] = path.basename(filePath);
-						prediction['metrics'] = metrics
 
-						i += 1
-						progress.report({ increment: increment, message: "Pocessed ${i} files out of ${files.lenght}" });
-						panel.webview.html = getWebviewContent(prediction)
-					})	
+						predict(query).then((prediction: any) =>{
+							
+							if(prediction == undefined){
+								return
+							}
+							
+							prediction['file'] = path.basename(filePath);
+							prediction['metrics'] = metrics
+	
+							panel.webview.html = getWebviewContent(prediction)
+						})
+					}
 
 					// delete folder
 					fs.rmdir(unzipped_dir, { recursive: true }, (err) => {
 						if (err) throw err;
 					});
+
+					progress.report({ increment: 100, message: "Done!" });
 				})
 			}
 			else{
+				panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Running prediction. Please wait...')
+				accordion = ''
 				let language = undefined
 				let metrics = undefined
 				let model_id = undefined
 
-				progress.report({ increment: 25, message: "Preparing model..." });
+				progress.report({ increment: 50, message: "Preparing model..." });
 
 				const content = fs.readFileSync(filePath, 'utf-8');
 				if(content.includes('tosca_definitions_version')) {
@@ -208,7 +265,7 @@ export function activate(context: vscode.ExtensionContext) {
 				prediction['file'] = path.basename(filePath);
 				prediction['metrics'] = metrics
 
-				progress.report({ increment: 75, message: "Done! See the opened panel for more information." });
+				progress.report({ increment: 100, message: "Done! See the opened panel for more information." });
 				panel.webview.html = getWebviewContent(prediction)
 			}
 
@@ -268,9 +325,9 @@ var viewContent = `
 </body>
 </html>`
 
+
 function getWebviewContent(data: any) {
 	let title:string = data.file.toString()
-	var accordion:string = ''
 	let tbody:string = ''
 
 	Object.entries(data.metrics).forEach(([key, value]:any) => {
@@ -326,6 +383,7 @@ function getWebviewContent(data: any) {
 			</button>
 			<div id="collapse-${id}" class="collapse" aria-labelledby="heading-${id}" data-parent="#accordion">
 				<div class="card-body">
+					<p> <b>Status:</b> ${data.failure_prone ? 'failure-prone':'no action required'}</p> </br>
 					${prediction_description}
 					<table data-toggle="table">
 						<thead>

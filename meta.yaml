@@ -1,0 +1,14 @@
+apiVersion: v2
+publisher: radon
+name: radon-defect-predictor
+version: 0.0.5
+type: VS Code extension
+displayName: RADON-h2020 Defect Predictor
+title: A Defect Predictor for Infrastructure-as-Code by RADON
+description: A customized extension for analyzing the defectiveness of IaC blueprints
+icon: https://www.eclipse.org/che/images/logo-eclipseche.svg
+repository: https://github.com/radon-h2020/radon-defect-prediction-plugin
+category: Other
+spec:
+  extensions:
+    - https://raw.githubusercontent.com/radon-h2020/radon-defect-prediction-plugin/master/radon-defect-predictor-0.0.5.vsix
