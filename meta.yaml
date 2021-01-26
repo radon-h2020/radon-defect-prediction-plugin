@@ -2,7 +2,7 @@ apiVersion: v2
 publisher: radon
 name: radon-defect-predictor
 version: 0.0.5
-type: VS Code extension
+type: chePlugin
 displayName: RADON-h2020 Defect Predictor
 title: A Defect Predictor for Infrastructure-as-Code by RADON
 description: A customized extension for analyzing the defectiveness of IaC blueprints
@@ -11,7 +11,7 @@ repository: https://github.com/radon-h2020/radon-defect-prediction-plugin
 category: Other
 spec:
   containers:                                                   
-    - image: stefadp/cbmc:latest                                                    
+    - image: stefadp/radon-dpt-plugin                                                    
       memoryLimit: 512Mi                                           
       memoryRequest: 512Mi                                        
       cpuLimit: 2                                                
