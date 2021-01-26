@@ -1,7 +1,7 @@
 apiVersion: v2
 publisher: radon
 name: radon-defect-predictor
-version: 0.0.5
+version: 0.0.6
 type: VS Code extension
 displayName: RADON-h2020 Defect Predictor
 title: A Defect Predictor for Infrastructure-as-Code by RADON
@@ -17,4 +17,4 @@ spec:
       cpuLimit: 2                                                
       cpuRequest: 2 
   extensions:
-    - https://raw.githubusercontent.com/radon-h2020/radon-defect-prediction-plugin/master/radon-defect-predictor-0.0.5.vsix
+    - https://raw.githubusercontent.com/radon-h2020/radon-plugin-registry/master/radon/radon-defect-predictor/0.0.5/radon-defect-predictor-0.0.5.vsix
