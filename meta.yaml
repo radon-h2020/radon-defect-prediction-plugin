@@ -10,5 +10,11 @@ icon: https://www.eclipse.org/che/images/logo-eclipseche.svg
 repository: https://github.com/radon-h2020/radon-defect-prediction-plugin
 category: Other
 spec:
+  containers:                                                   
+    - image: radonconsortium/radon-dp:latest                                                    
+      memoryLimit: 512Mi                                           
+      memoryRequest: 512Mi                                        
+      cpuLimit: 2                                                
+      cpuRequest: 2     
   extensions:
     - https://raw.githubusercontent.com/radon-h2020/radon-defect-prediction-plugin/master/radon-defect-predictor-0.0.5.vsix
