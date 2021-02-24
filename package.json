@@ -2,7 +2,7 @@
 	"name": "radon-defect-predictor",
 	"displayName": "Radon-h2020 Defect Predictor",
 	"description": "A plugin to run the RADONh2020 Defect Predictor",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"publisher": "sdallapalma",
 	"url": "https://github.com/radon-h2020/radon-defect-prediction-plugin",
 	"engines": {
@@ -29,19 +29,28 @@
 				"aliases": [
 					"csar"
 				]
+			},
+			{
+				"id": "tosca",
+				"extensions": [
+					".tosca"
+				],
+				"aliases": [
+					"tosca"
+				]
 			}
 		],
 		"menus": {
 			"editor/context": [
 				{
-					"when": "resourceLangId == yaml",
+					"when": "resourceLangId == yaml || resourceLangId == tosca",
 					"command": "radon-defect-prediction-plugin.run",
 					"group": "myGroup@1"
 				}
 			],
 			"explorer/context": [
 				{
-					"when": "resourceLangId == csar || resourceLangId == yaml",
+					"when": "resourceLangId == csar || resourceLangId == yaml || resourceLangId == tosca",
 					"command": "radon-defect-prediction-plugin.run",
 					"group": "myGroup@1"
 				}

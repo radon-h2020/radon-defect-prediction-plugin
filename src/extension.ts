@@ -55,9 +55,17 @@ const metrics_description:any = {
 	num_distinct_modules: "Count the distinct modules in the script. Modules are reusable and standalone scripts called by tasks. They allow to change or get information about the state of the system and can be interpreted as a degree of responsibility of the blueprint. Therefore, a blueprint consisting of many distinct modules might be less self-contained and potentially affect the complexity and maintainability of the system, as it is responsible for executing many different tasks rather than a task several times with different options, for example, to ensure the presence of dependencies in the system. Interpretation: the more the distinct modules, the more challenging to maintain the blueprint.", 
 	num_external_modules: "Count occurrences of modules created by the users and not maintained by the Ansible community. Interpretation: The more the external modules, the more challenging to maintain the blueprint and the higher the chance of system’s misbehavior",
 	num_filters: "Count of '|' syntax occurrences inside {{*}} expressions. Filters transform the data of a template expression, for example, for formatting or rendering them. Although they allow for transforming data in a very compact way, filters can be concatenated to perform a sequence of different actions. Interpretation: the more the filters, the lower the readability and the more challenging to maintain the blueprint.",
+	num_imports: "Number of import keys",
+	num_interfaces: "Number of interfaces in the blueprint",
 	num_keys: "Count of keys in the dictionary representing a playbook or tasks",
 	num_loops: "Count of 'loop' and 'with_*' syntax occurrences",
+	num_node_templates: "Number of node templates in the blueprint",
+	num_node_types: "Number of node types in the blueprint",
 	num_parameters: "Count the total number of parameters, that is, the keys of the dictionary representing a module. In Ansible parameters (or arguments) describe the desired state of the system. Interpretation: the more the parameters, the more challenging to debug and test the blueprint.",
+	num_properties: "Count the total number of properties in the blueprint",
+	num_relationship_templates: "Number of relationship templates in the blueprint",
+	num_relationship_types: "Number of relationship types in the blueprint",
+	num_shell_scripts: "Number of shell scripts called by the blueprint",
 	num_tasks: "Measures the number of functions in a script. An Ansible task is equivalent to a method, as its goal is to execute a module with very specific arguments. Interpretation: the higher the number of tasks, the more complex and the more challenging to maintain the blueprint.",
 	num_tokens: "Count the words separated by a blank space. Interpretation: the more the tokens, the more complex is the blueprint.",
 	num_unique_names: "Number of plays and tasks with a unique name. Uniquely naming plays and tasks is a best practice to locate problematic tasks quickly. Duplicate names may lead to not deterministic or at least not obvious behaviors. Interpretation: the more the entities with unique names the higher the maintainability and readability of the blueprint.",
@@ -88,7 +96,7 @@ function walk(dir: any, filelist: any) {
 
 function extract_ansible_metrics(filePath:string) {
 	try{
-		const res = cp.execSync(`ansible-metrics ${filePath} -o`)
+		const res = cp.execSync(`ansible-metrics ${filePath} -o --omit-zero-metrics`)
 		return JSON.parse(res.toString())
 	}
 	catch (err){
@@ -99,7 +107,6 @@ function extract_ansible_metrics(filePath:string) {
 
 function extract_tosca_metrics(filePath:string) {
 	try{	
-		// TODO replace with tosca-metrics
 		const res = cp.execSync(`tosca-metrics ${filePath} -o --omit-zero-metrics`)
 		return JSON.parse(res.toString())
 	}
@@ -345,7 +352,7 @@ function getWebviewContent(data: any) {
 			else if(value <= thresholds[key]['outlier']) color_class = 'orange'
 			else color_class = 'red'
 			
-			if(key == 'num_unique_names'){
+			if(key == 'num_unique_names'){  // The more, the better
 				const iqr = thresholds[key]['q1'] + thresholds[key]['q3']
 				if(value >= thresholds[key]['median']) color_class = 'white'
 				else if(value >= thresholds[key]['q1']) color_class = 'yellow'
@@ -353,24 +360,39 @@ function getWebviewContent(data: any) {
 				else color_class = 'red'
 			}
 
-			if(value != 0)
-				tbody += `<tr><td>${formatted_name} <span type="button" data-toggle="tooltip" data-placement="bottom" title="${metrics_description[key]}">&#9432;</span></td><td><div style="text-align: right; background-color: ${color_class}">${value}</div></td></tr>`
+			//tbody += `<tr><td>${formatted_name} <span type="button" data-toggle="tooltip" data-placement="bottom" title="${metrics_description[key]}">&#9432;</span></td><td><div style="text-align: right; background-color: ${color_class}">${value}</div></td></tr>`
+		}
+
+		if (key in metrics_description){
+			tbody += `<tr><td>${formatted_name} <span type="button" data-toggle="tooltip" data-placement="bottom" title="${metrics_description[key]}">&#9432;</span></td><td><div style="text-align: right; background-color: ${color_class}">${value}</div></td></tr>`
 		}
 	});
 	
 	let prediction_description = ''
 
 	if(data.failure_prone){
-		prediction_description = 'This script was predicted <b>failure-prone</b> because:<ul>'
-		for(const clause of data.decision){
-			let formatted_metric_name = clause[0].toLowerCase()
-				.split('_')
-				.map((s:string) => s.charAt(0).toUpperCase() + s.substring(1))
-				.join(' ');
 
-			prediction_description += `<li>${formatted_metric_name} ${clause[1]} ${Math.round(clause[2] * 100) / 100}</li>`
+		for(const defect of data.defects){
+			if(defect.type == "general"){
+				prediction_description += 'This script was predicted <b>failure-prone</b> because:<ul>'
+			}else{
+				prediction_description += `This script was predicted having a <b>${defect.type}-related problem</b> because:<ul>`
+			}
+
+			for(const clause of defect.decision){
+				let formatted_metric_name = clause[0].toLowerCase()
+					.split('_')
+					.map((s:string) => s.charAt(0).toUpperCase() + s.substring(1))
+					.join(' ');
+				
+				if(clause[1] == "<=" && clause[2] == 0){
+					clause[1] = "="
+				}
+
+				prediction_description += `<li>${formatted_metric_name} ${clause[1]} ${Math.round(clause[2] * 100) / 100}</li>`
+			}
+			prediction_description += '</ul><br>'
 		}
-		prediction_description += '</ul>'
 	}
 
 	let id = title.replace(/[_\.\/]/g, '')
