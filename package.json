@@ -85,7 +85,7 @@
 		"vscode-test": "^1.3.0"
 	},
 	"dependencies": {
-		"axios": "^0.21.1",
+		"axios": "^0.21.2",
 		"extract-zip": "2.0.1",
 		"supports-color": "^8.1.1"
 	}
