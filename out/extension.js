@@ -146,6 +146,7 @@ function predict(queryParams) {
 }
 function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri) => __awaiter(this, void 0, void 0, function* () {
+        console.log(uri);
         var panel = vscode.window.createWebviewPanel('radon-defect-predictor', 'Receptor', vscode.ViewColumn.Two, {
             localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'src', 'html'))],
             enableScripts: true
@@ -160,11 +161,15 @@ function activate(context) {
                 console.log("User canceled the operation");
             });
             progress.report({ increment: 0 });
-            const editor = vscode.window.activeTextEditor;
-            if (!editor)
-                return;
-            let filePath = uri ? path.normalize(uri.path) : path.normalize(editor.document.uri.path);
+            // const editor = vscode.window.activeTextEditor
+            // console.log(uri.path)
+            // if(!editor){
+            // 	return null;
+            // }
+            // let filePath = uri ? path.normalize(uri.path) : path.normalize(editor.document.uri.path)
+            let filePath = uri.path;
             filePath = filePath.replace('\\c:', 'C:');
+            console.log(filePath);
             const fileExtension = filePath.split('.').pop();
             progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
             if (fileExtension == 'csar') {

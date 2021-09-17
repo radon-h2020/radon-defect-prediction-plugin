@@ -147,6 +147,8 @@ async function predict(queryParams: string){
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.run', async (uri: vscode.Uri)  => {
 		
+		console.log(uri)
+
 		
 		var panel:any = vscode.window.createWebviewPanel(
 			'radon-defect-predictor',
@@ -171,11 +173,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 			progress.report({ increment: 0 });
 			
-			const editor = vscode.window.activeTextEditor
-			if(!editor) return
-			
-			let filePath = uri ? path.normalize(uri.path) : path.normalize(editor.document.uri.path)
+			let filePath = uri.path
 			filePath = filePath.replace('\\c:', 'C:')
+
 			const fileExtension = filePath.split('.').pop()
 			
 			progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
