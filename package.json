@@ -2,7 +2,7 @@
 	"name": "radon-defect-predictor",
 	"displayName": "Radon-h2020 Defect Predictor",
 	"description": "A plugin to run the RADONh2020 Defect Predictor",
-	"version": "0.0.8",
+	"version": "0.1.1",
 	"publisher": "sdallapalma",
 	"url": "https://github.com/radon-h2020/radon-defect-prediction-plugin",
 	"engines": {
@@ -16,7 +16,8 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:radon-defect-prediction-plugin.run"
+		"onCommand:radon-defect-prediction-plugin.run",
+		"onCommand:radon-defect-prediction-plugin.defuse"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -45,21 +46,39 @@
 				{
 					"when": "resourceLangId == yaml || resourceLangId == tosca",
 					"command": "radon-defect-prediction-plugin.run",
+					"title": "Run Detection",
 					"group": "myGroup@1"
+				},
+				{
+					"command": "radon-defect-prediction-plugin.defuse",
+					"title": "Open DEFUSE",
+					"group": "myGroup@2"
 				}
 			],
 			"explorer/context": [
 				{
 					"when": "resourceLangId == csar || resourceLangId == yaml || resourceLangId == tosca",
 					"command": "radon-defect-prediction-plugin.run",
+					"title": "Run Detection",
 					"group": "myGroup@1"
+				},
+				{
+					"command": "radon-defect-prediction-plugin.defuse",
+					"title": "Open DEFUSE",
+					"group": "myGroup@2"
 				}
 			]
 		},
 		"commands": [
 			{
 				"command": "radon-defect-prediction-plugin.run",
-				"title": "Run detection"
+				"title": "Run Detection",
+				"group": "myGroup@1"
+			},
+			{
+				"command": "radon-defect-prediction-plugin.defuse",
+				"title": "Open DEFUSE",
+				"group": "myGroup@2"
 			}
 		]
 	},

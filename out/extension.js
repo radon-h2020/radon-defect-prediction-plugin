@@ -98,26 +98,6 @@ function walk(dir, filelist) {
     return filelist;
 }
 ;
-function extract_ansible_metrics(filePath) {
-    try {
-        const res = cp.execSync(`ansible-metrics ${filePath} -o --omit-zero-metrics`);
-        return JSON.parse(res.toString());
-    }
-    catch (err) {
-        console.log(err);
-        return undefined;
-    }
-}
-function extract_tosca_metrics(filePath) {
-    try {
-        const res = cp.execSync(`tosca-metrics ${filePath} -o --omit-zero-metrics`);
-        return JSON.parse(res.toString());
-    }
-    catch (err) {
-        console.log(err);
-        return undefined;
-    }
-}
 function fetch_model(language) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -131,128 +111,110 @@ function fetch_model(language) {
         }
     });
 }
-function predict(queryParams) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            return yield Promise.resolve(AXIOS.get(`https://radon-test-api.herokuapp.com/predictions?${queryParams}`)
-                .then(function (response) { return response.data; })
-                .catch(function () { return undefined; }));
-        }
-        catch (err) {
-            console.log(err);
-            return undefined;
-        }
-    });
-}
 function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.run', (uri) => __awaiter(this, void 0, void 0, function* () {
-        console.log(uri);
-        var panel = vscode.window.createWebviewPanel('radon-defect-predictor', 'Receptor', vscode.ViewColumn.Two, {
-            localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'src', 'html'))],
-            enableScripts: true
-        });
-        panel.webview.html = HTML_SPINNER.replace('{{info}}', '');
-        vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: "Running failures detection",
-            cancellable: true
-        }, (progress, token) => __awaiter(this, void 0, void 0, function* () {
-            token.onCancellationRequested(() => {
-                console.log("User canceled the operation");
-            });
-            progress.report({ increment: 0 });
-            // const editor = vscode.window.activeTextEditor
-            // console.log(uri.path)
-            // if(!editor){
-            // 	return null;
-            // }
-            // let filePath = uri ? path.normalize(uri.path) : path.normalize(editor.document.uri.path)
-            let filePath = uri.path;
-            filePath = filePath.replace('\\c:', 'C:');
-            console.log(filePath);
-            const fileExtension = filePath.split('.').pop();
-            progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
-            if (fileExtension == 'csar') {
-                panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Extracting the CSAR...');
-                accordion = '';
-                const model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
-                const unzipped_dir = filePath.replace('.csar', '');
-                progress.report({ increment: 50, message: "Extracting and analyzing the CSAR..." });
-                extract(filePath, { dir: unzipped_dir }).then(function (err) {
-                    if (err) {
-                        console.log(err);
-                        panel.webview.html = '<h2>Ops. We are sorry. An error occurred!</h2>';
-                        return;
-                    }
-                    let files = walk(unzipped_dir, []);
-                    panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Predicting the failure-proneness of TOSCA blueprints...');
-                    progress.report({ increment: 80, message: "Predicting failure-proneness of TOSCA blueprints..." });
-                    for (let i = 0; i < files.length; i++) {
-                        const filePath = files[i];
-                        const metrics = extract_tosca_metrics(filePath);
-                        if (metrics == undefined) {
-                            continue;
-                        }
-                        let query = '';
-                        for (let [key, value] of Object.entries(metrics)) {
-                            if (typeof value == "number") {
-                                query += key + "=" + value + "&";
-                            }
-                        }
-                        query += "language=tosca&model_id=" + model_id;
-                        predict(query).then((prediction) => {
-                            if (prediction == undefined) {
-                                return;
-                            }
-                            prediction['file'] = path.basename(filePath);
-                            prediction['metrics'] = metrics;
-                            panel.webview.html = getWebviewContent(prediction);
-                        });
-                    }
-                    // delete folder
-                    fs.rmdir(unzipped_dir, { recursive: true }, (err) => {
-                        if (err)
-                            throw err;
-                    });
-                    progress.report({ increment: 100, message: "Done!" });
-                });
-            }
-            else {
-                panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Running prediction. Please wait...');
-                accordion = '';
-                let language = undefined;
-                let metrics = undefined;
-                let model_id = undefined;
-                progress.report({ increment: 50, message: "Preparing model..." });
-                const content = fs.readFileSync(filePath, 'utf-8');
-                if (content.includes('tosca_definitions_version')) {
-                    language = 'tosca';
-                    metrics = extract_tosca_metrics(filePath);
-                    model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
-                }
-                else {
-                    language = 'ansible';
-                    metrics = extract_ansible_metrics(filePath);
-                    model_id = ansible_model_id ? ansible_model_id : yield fetch_model('ansible');
-                }
-                let query = '';
-                for (let [key, value] of Object.entries(metrics)) {
-                    if (typeof value == "number") {
-                        query += key + "=" + value + "&";
-                    }
-                }
-                query += "language=" + language + "&model_id=" + model_id;
-                const prediction = yield predict(query);
-                prediction['file'] = path.basename(filePath);
-                prediction['metrics'] = metrics;
-                progress.report({ increment: 100, message: "Done! See the opened panel for more information." });
-                panel.webview.html = getWebviewContent(prediction);
-            }
-            return;
-        }));
+        run(uri, context);
+    })));
+    // Launch DEFUSE
+    context.subscriptions.push(vscode.commands.registerCommand('radon-defect-prediction-plugin.defuse', (uri) => __awaiter(this, void 0, void 0, function* () {
+        launchDefuse();
     })));
 }
 exports.activate = activate;
+function launchDefuse() {
+    vscode.env.openExternal(vscode.Uri.parse("http://localhost:4200/"));
+}
+function run(uri, context) {
+    var panel = vscode.window.createWebviewPanel('radon-defect-predictor', 'DEFUSE', vscode.ViewColumn.Two, {
+        localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'src', 'html'))],
+        enableScripts: true
+    });
+    panel.webview.html = HTML_SPINNER.replace('{{info}}', '');
+    vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Running failures detection",
+        cancellable: true
+    }, (progress, token) => __awaiter(this, void 0, void 0, function* () {
+        token.onCancellationRequested(() => {
+            console.log("User canceled the operation");
+        });
+        progress.report({ increment: 0 });
+        let filePath = uri.path;
+        filePath = filePath.replace('\\c:', 'C:');
+        const fileExtension = filePath.split('.').pop();
+        progress.report({ increment: 25, message: "Model fetched! I am runnig the predictions. Please wait..." });
+        if (fileExtension == 'csar') {
+            panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Extracting the CSAR...');
+            accordion = '';
+            const model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
+            const unzipped_dir = filePath.replace('.csar', '');
+            progress.report({ increment: 50, message: "Extracting and analyzing the CSAR..." });
+            extract(filePath, { dir: unzipped_dir }).then(function (err) {
+                if (err) {
+                    console.log(err);
+                    panel.webview.html = '<h2>Ops. We are sorry. An error occurred!</h2>';
+                    return;
+                }
+                let files = walk(unzipped_dir, []);
+                panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Predicting the failure-proneness of TOSCA blueprints...');
+                progress.report({ increment: 80, message: "Predicting failure-proneness of TOSCA blueprints..." });
+                for (let i = 0; i < files.length; i++) {
+                    const filePath = files[i];
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    AXIOS.post('https://radon-dpt-demo.herokuapp.com/predictions?language=tosca&model_id=' + model_id, content.toString(), {
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        }
+                    }).then((response) => {
+                        if (response == undefined) {
+                            return;
+                        }
+                        console.log(response.data);
+                        let prediction = response.data;
+                        prediction['file'] = path.basename(filePath);
+                        panel.webview.html = getWebviewContent(prediction);
+                    });
+                }
+                // delete folder
+                fs.rmdir(unzipped_dir, { recursive: true }, (err) => {
+                    if (err)
+                        throw err;
+                });
+                progress.report({ increment: 100, message: "Done!" });
+            });
+        }
+        else {
+            panel.webview.html = HTML_SPINNER.replace('{{info}}', 'Running prediction. Please wait...');
+            accordion = '';
+            let language = undefined;
+            let model_id = undefined;
+            progress.report({ increment: 50, message: "Preparing model..." });
+            const content = fs.readFileSync(filePath, 'utf-8');
+            if (content.includes('tosca_definitions_version')) {
+                language = 'tosca';
+                model_id = tosca_model_id ? tosca_model_id : yield fetch_model('tosca');
+            }
+            else {
+                language = 'ansible';
+                model_id = ansible_model_id ? ansible_model_id : yield fetch_model('ansible');
+            }
+            AXIOS.post('https://radon-dpt-demo.herokuapp.com/predictions?language=' + language + "&model_id=" + model_id, content.toString(), {
+                headers: {
+                    'Content-Type': 'text/plain',
+                }
+            }).then((response) => {
+                if (response == undefined) {
+                    return;
+                }
+                let prediction = response.data;
+                prediction['file'] = path.basename(filePath);
+                progress.report({ increment: 100, message: "Done! See the opened panel for more information." });
+                panel.webview.html = getWebviewContent(prediction);
+            });
+        }
+        return;
+    }));
+}
 var viewContent = `
 <!doctype html>
 <html lang="en">
